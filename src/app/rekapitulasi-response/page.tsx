@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { useSession } from "@/components/session/SessionProvider";
 import { useRouter } from "next/navigation";
-import SearchableSelect from "@/components/ui/SearchableSelect";
 import * as XLSX from "xlsx";
 import ExportExcelModal, {
   ExportColumn,
@@ -114,6 +113,8 @@ export default function RekapitulasiResponsePage() {
   const [q, setQ] = useState("");
 
   const [statusKeputusanOpts, setStatusKeputusanOpts] = useState<string[]>([]);
+  const [statusAkhirOpts, setStatusAkhirOpts] = useState<string[]>([]);
+  const [companiesOpts, setCompaniesOpts] = useState<string[]>([]);
 
   const [openDetail, setOpenDetail] = useState<string | null>(null);
 
@@ -144,14 +145,23 @@ export default function RekapitulasiResponsePage() {
       setLoading(true);
       const data = await apiListTaken();
 
-      // Fetch parameters untuk status_keputusan
+      // Fetch parameters untuk status_keputusan, status_akhir, dan perusahaan
       try {
-        const pRes = await fetch("/api/parameters", { cache: "no-store" });
+        const pRes = await fetch("/api/parameters", {
+          cache: "no-store",
+          credentials: "include",
+        });
         if (pRes.ok) {
           const pJson = await pRes.json();
           const pData = pJson?.data;
           if (pData?.status_keputusan) {
             setStatusKeputusanOpts(pData.status_keputusan);
+          }
+          if (pData?.status_akhir) {
+            setStatusAkhirOpts(pData.status_akhir);
+          }
+          if (pData?.perusahaan) {
+            setCompaniesOpts(pData.perusahaan);
           }
         }
       } catch (e) {
@@ -476,6 +486,8 @@ export default function RekapitulasiResponsePage() {
                             isSuperAdmin={isSuperAdmin}
                             currentUserId={user?.userId ?? ""}
                             statusKeputusanOpts={statusKeputusanOpts}
+                            statusAkhirOpts={statusAkhirOpts}
+                            companiesOpts={companiesOpts}
                             onUpdated={(updatedRow) => {
                               // update lokal di tabel
                               setRows((prev) =>
@@ -520,6 +532,8 @@ function FragmentRow({
   isSuperAdmin,
   currentUserId,
   statusKeputusanOpts,
+  statusAkhirOpts = [],
+  companiesOpts = [],
   onUpdated,
 }: {
   r: EProcRow;
@@ -530,6 +544,8 @@ function FragmentRow({
   isSuperAdmin: boolean;
   currentUserId: string;
   statusKeputusanOpts: string[];
+  statusAkhirOpts?: string[];
+  companiesOpts?: string[];
   onUpdated: (r: EProcRow) => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -548,8 +564,21 @@ function FragmentRow({
     activeTab: "items",
   });
 
-  const [companies, setCompanies] = useState<string[]>([]);
-  const [statusAkhirOptions, setStatusAkhirOptions] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<string[]>(companiesOpts);
+  const [statusAkhirOptions, setStatusAkhirOptions] =
+    useState<string[]>(statusAkhirOpts);
+
+  useEffect(() => {
+    if (statusAkhirOpts && statusAkhirOpts.length > 0) {
+      setStatusAkhirOptions(statusAkhirOpts);
+    }
+  }, [statusAkhirOpts]);
+
+  useEffect(() => {
+    if (companiesOpts && companiesOpts.length > 0) {
+      setCompanies(companiesOpts);
+    }
+  }, [companiesOpts]);
 
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set(),
@@ -558,8 +587,14 @@ function FragmentRow({
   useEffect(() => {
     if (isOpen) {
       setSelectedIndices(new Set()); // reset on open
-      fetch("/api/parameters")
-        .then((res) => res.json())
+      fetch("/api/parameters", {
+        cache: "no-store",
+        credentials: "include",
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch parameters");
+          return res.json();
+        })
         .then((json) => {
           if (json?.data?.perusahaan) {
             setCompanies(json.data.perusahaan);
@@ -1228,32 +1263,29 @@ function FragmentRow({
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                     Status Akhir (Manual)
                   </label>
-                  <SearchableSelect
-                    className="mt-1"
+                  <select
+                    className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 disabled:bg-slate-100 font-medium text-slate-700 bg-white transition-all shadow-sm mt-1"
                     value={form.statusAkhir}
-                    onChange={(val: string) =>
-                      setForm({ ...form, statusAkhir: val })
+                    onChange={(e) =>
+                      setForm({ ...form, statusAkhir: e.target.value })
                     }
-                    isDisabled={!canEdit || loading || !isDone}
-                    options={statusAkhirOptions
-                      .filter((s) => {
-                        const low = s.toLowerCase();
-                        return (
-                          low.includes("rilis kontrak") ||
-                          low.includes("barang terkirim ke user") ||
-                          low.includes("terbit bast")
-                        );
-                      })
-                      .map((s) => ({
-                        value: s,
-                        label: s,
-                      }))}
-                    placeholder={
-                      !isDone
-                        ? "Terkunci (Belum Done)"
-                        : "Pilih Status Akhir..."
-                    }
-                  />
+                    disabled={!canEdit || loading || !isDone}
+                  >
+                    <option value="">
+                      {!isDone
+                        ? "Terkunci (Status Usulan belum Done)"
+                        : !canEdit
+                        ? "Terkunci (Hanya admin penangan yang dapat edit)"
+                        : statusAkhirOptions.length === 0
+                        ? "Pilihan Status Akhir Kosong di Parameter"
+                        : "Pilih Status Akhir..."}
+                    </option>
+                    {statusAkhirOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
                   {!isDone && (
                     <span className="text-[10px] items-center text-amber-600/90 font-medium ml-1 mt-1 inline-flex gap-1.5 leading-tight max-w-[90%]">
                       <svg
@@ -1269,7 +1301,7 @@ function FragmentRow({
                           d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      Status Usulan harus &quot;Done&quot; untuk diedit.
+                      Status Akhir hanya dapat dipilih jika Status Usulan sudah &quot;Done&quot; (semua item barang selesai diproses).
                     </span>
                   )}
                 </div>
