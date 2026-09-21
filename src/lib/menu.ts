@@ -17,6 +17,21 @@ export const MENUS_BY_ROLE: Record<Role, MenuSection[]> = {
     {
       title: 'SKRIPSI',
       icon: 'Bot',
+      items: [
+        { label: 'Input Database', href: '/input-database', icon: 'Bot' },
+        {
+          label: 'Tracking Database',
+          href: '/tracking-database',
+          icon: 'Database',
+        },
+        {
+          label: 'Tracking Broadcast',
+          href: '/tracking-broadcast',
+          icon: 'MessageCircleCode',
+        },
+        { label: 'Tracking Call', href: '/tracking-call', icon: 'Phone' },
+        { label: 'Report Progres', href: '/report-progres', icon: 'FileText' },
+      ],
     },
     {
       title: 'TELEMARKETING',
