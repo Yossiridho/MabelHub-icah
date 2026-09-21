@@ -15,6 +15,10 @@ export type MenuSection = {
 export const MENUS_BY_ROLE: Record<Role, MenuSection[]> = {
   SUPERADMIN: [
     {
+      title: 'SKRIPSI',
+      icon: 'Bot',
+    },
+    {
       title: 'TELEMARKETING',
       icon: 'Bot',
       items: [
